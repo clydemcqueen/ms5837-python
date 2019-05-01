@@ -1,7 +1,12 @@
+from __future__ import division
+from __future__ import print_function
+from future.builtins import range
+from future.builtins import object
+from past.utils import old_div
 try:
     import smbus
 except:
-    print 'Try sudo apt-get install python-smbus'
+    print('Try sudo apt-get install python-smbus')
     
 from time import sleep
 
@@ -53,7 +58,7 @@ class MS5837(object):
         try:
             self._bus = smbus.SMBus(bus)
         except:
-            print("Bus %d is not available.") % bus
+            print(("Bus %d is not available.") % bus)
             print("Available busses are listed as /dev/i2c*")
             self._bus = None
         
@@ -83,18 +88,18 @@ class MS5837(object):
                         
         crc = (self._C[0] & 0xF000) >> 12
         if crc != self._crc4(self._C):
-            print "PROM read error, CRC failed!"
+            print("PROM read error, CRC failed!")
             return False
         
         return True
         
     def read(self, oversampling=OSR_8192):
         if self._bus is None:
-            print "No bus!"
+            print("No bus!")
             return False
         
         if oversampling < OSR_256 or oversampling > OSR_8192:
-            print "Invalid oversampling option!"
+            print("Invalid oversampling option!")
             return False
         
         # Request D1 conversion (temperature)
@@ -143,7 +148,7 @@ class MS5837(object):
         
     # Depth relative to MSL pressure in given fluid density
     def depth(self):
-        return (self.pressure(UNITS_Pa)-101300)/(self._fluidDensity*9.80665)
+        return old_div((self.pressure(UNITS_Pa)-101300),(self._fluidDensity*9.80665))
     
     # Altitude relative to MSL pressure
     def altitude(self):
@@ -157,34 +162,34 @@ class MS5837(object):
 
         dT = self._D2-self._C[5]*256
         if self._model == MODEL_02BA:
-            SENS = self._C[1]*65536+(self._C[3]*dT)/128
-            OFF = self._C[2]*131072+(self._C[4]*dT)/64
-            self._pressure = (self._D1*SENS/(2097152)-OFF)/(32768)
+            SENS = self._C[1]*65536+old_div((self._C[3]*dT),128)
+            OFF = self._C[2]*131072+old_div((self._C[4]*dT),64)
+            self._pressure = old_div((old_div(self._D1*SENS,(2097152))-OFF),(32768))
         else:
-            SENS = self._C[1]*32768+(self._C[3]*dT)/256
-            OFF = self._C[2]*65536+(self._C[4]*dT)/128
-            self._pressure = (self._D1*SENS/(2097152)-OFF)/(8192)
+            SENS = self._C[1]*32768+old_div((self._C[3]*dT),256)
+            OFF = self._C[2]*65536+old_div((self._C[4]*dT),128)
+            self._pressure = old_div((old_div(self._D1*SENS,(2097152))-OFF),(8192))
         
-        self._temperature = 2000+dT*self._C[6]/8388608
+        self._temperature = 2000+old_div(dT*self._C[6],8388608)
 
         # Second order compensation
         if self._model == MODEL_02BA:
-            if (self._temperature/100) < 20: # Low temp
-                Ti = (11*dT*dT)/(34359738368)
-                OFFi = (31*(self._temperature-2000)*(self._temperature-2000))/8
-                SENSi = (63*(self._temperature-2000)*(self._temperature-2000))/32
+            if (old_div(self._temperature,100)) < 20: # Low temp
+                Ti = old_div((11*dT*dT),(34359738368))
+                OFFi = old_div((31*(self._temperature-2000)*(self._temperature-2000)),8)
+                SENSi = old_div((63*(self._temperature-2000)*(self._temperature-2000)),32)
                 
         else:
-            if (self._temperature/100) < 20: # Low temp
-                Ti = (3*dT*dT)/(8589934592)
-                OFFi = (3*(self._temperature-2000)*(self._temperature-2000))/2
-                SENSi = (5*(self._temperature-2000)*(self._temperature-2000))/8
-                if (self._temperature/100) < -15: # Very low temp
-                    OFFi = OFFi+7*(self._temperature+1500l)*(self._temperature+1500)
-                    SENSi = SENSi+4*(self._temperature+1500l)*(self._temperature+1500)
-            elif (self._temperature/100) >= 20: # High temp
-                Ti = 2*(dT*dT)/(137438953472)
-                OFFi = (1*(self._temperature-2000)*(self._temperature-2000))/16
+            if (old_div(self._temperature,100)) < 20: # Low temp
+                Ti = old_div((3*dT*dT),(8589934592))
+                OFFi = old_div((3*(self._temperature-2000)*(self._temperature-2000)),2)
+                SENSi = old_div((5*(self._temperature-2000)*(self._temperature-2000)),8)
+                if (old_div(self._temperature,100)) < -15: # Very low temp
+                    OFFi = OFFi+7*(self._temperature+1500)*(self._temperature+1500)
+                    SENSi = SENSi+4*(self._temperature+1500)*(self._temperature+1500)
+            elif (old_div(self._temperature,100)) >= 20: # High temp
+                Ti = old_div(2*(dT*dT),(137438953472))
+                OFFi = old_div((1*(self._temperature-2000)*(self._temperature-2000)),16)
                 SENSi = 0
         
         OFF2 = OFF-OFFi
@@ -192,10 +197,10 @@ class MS5837(object):
         
         if self._model == MODEL_02BA:
             self._temperature = (self._temperature-Ti)
-            self._pressure = (((self._D1*SENS2)/2097152-OFF2)/32768)/100.0
+            self._pressure = (old_div((old_div((self._D1*SENS2),2097152)-OFF2),32768))/100.0
         else:
             self._temperature = (self._temperature-Ti)
-            self._pressure = (((self._D1*SENS2)/2097152-OFF2)/8192)/10.0   
+            self._pressure = (old_div((old_div((self._D1*SENS2),2097152)-OFF2),8192))/10.0   
         
     # Cribbed from datasheet
     def _crc4(self, n_prom):
